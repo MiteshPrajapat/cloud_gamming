@@ -1,0 +1,45 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-gaming-950 text-slate-100 antialiased select-none;
+    overflow-x: hidden;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+  }
+}
+
+/* Prevent mobile pull-to-refresh & pinch zoom during cloud gameplay */
+.gameplay-active {
+  touch-action: none !important;
+  overscroll-behavior: none !important;
+  overflow: hidden !important;
+  user-select: none !important;
+}
+
+/* Custom glow effects for cloud gaming dashboard */
+.neon-glow-accent {
+  box-shadow: 0 0 15px rgba(0, 240, 255, 0.4), inset 0 0 10px rgba(0, 240, 255, 0.2);
+}
+
+.neon-glow-purple {
+  box-shadow: 0 0 20px rgba(121, 40, 202, 0.4);
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #0f111a;
+}
+::-webkit-scrollbar-thumb {
+  background: #282e47;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #00f0ff;
+}

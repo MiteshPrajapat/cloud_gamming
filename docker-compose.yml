@@ -1,0 +1,34 @@
+version: '3.8'
+
+services:
+  cloud-gaming:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: cloud-gaming-platform
+    restart: unless-stopped
+    ports:
+      - "8000:8000"   # Web Dashboard & FastAPI Backend
+      - "6080:6080"   # noVNC Websockify Stream
+      - "5900:5900"   # Internal RFB VNC (optional)
+    environment:
+      - DISPLAY=:99
+      - LIBGL_ALWAYS_SOFTWARE=1
+      - GALLIUM_DRIVER=llvmpipe
+      - MESA_GL_VERSION_OVERRIDE=3.3
+      - MAX_CONCURRENT_SESSIONS=1
+      - SESSION_IDLE_TIMEOUT_SECONDS=1800
+      - SCREEN_WIDTH=1280
+      - SCREEN_HEIGHT=720
+      - FRAMERATE=30
+    volumes:
+      - ./games:/app/games
+      - ./backend/games_data.json:/app/backend/games_data.json
+    deploy:
+      resources:
+        limits:
+          cpus: '3.8'
+          memory: 7.5G
+        reservations:
+          cpus: '2.0'
+          memory: 4.0G
