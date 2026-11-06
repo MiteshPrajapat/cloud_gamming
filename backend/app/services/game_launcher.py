@@ -1,4 +1,6 @@
 import os
+import sys
+import shutil
 import signal
 import subprocess
 import logging
@@ -29,15 +31,29 @@ class GameLauncher:
         for k, v in settings.software_rendering_env.items():
             env[k] = v
 
+        # Ensure /usr/games is in PATH (where Debian/Ubuntu installs native games)
+        current_path = env.get("PATH", "")
+        if "/usr/games" not in current_path:
+            env["PATH"] = f"/usr/games:{current_path}"
+
+        # Resolve binary path
+        executable = game.executable_path
+        if not os.path.isabs(executable):
+            found = shutil.which(executable, path=env["PATH"])
+            if found:
+                executable = found
+            elif os.path.exists(f"/usr/games/{executable}"):
+                executable = f"/usr/games/{executable}"
+
         cmd: List[str] = []
         if game.game_type == "windows":
             # Wine execution for lightweight Windows games
             wine_prefix = os.path.join(str(settings.games_dir), ".wine_prefix")
             os.makedirs(wine_prefix, exist_ok=True)
             env["WINEPREFIX"] = wine_prefix
-            cmd = ["wine", game.executable_path]
+            cmd = ["wine", executable]
         else:
-            cmd = [game.executable_path]
+            cmd = [executable]
 
         # Add launch arguments
         if game.launch_args:
@@ -48,7 +64,6 @@ class GameLauncher:
         logger.info(f"Launching game '{game.name}' for session {session_id}: {' '.join(cmd)}")
 
         try:
-            # On Linux/macOS, use preexec_fn=os.setsid so we can kill the entire process group
             kwargs = {
                 "env": env,
                 "stdout": subprocess.PIPE,
@@ -57,14 +72,12 @@ class GameLauncher:
             if os.name != "nt":
                 kwargs["preexec_fn"] = os.setsid
 
-            # If executable does not exist (e.g. running mock on dev machine), handle gracefully
             proc = None
             try:
                 proc = subprocess.Popen(cmd, **kwargs)
             except FileNotFoundError:
-                logger.warning(f"Executable '{game.executable_path}' not found on system PATH. Launching simulated game loop for development.")
-                # Run a simulated lightweight python process
-                simulated_cmd = ["python", "-c", "import time; print('Game running'); time.sleep(3600)"]
+                logger.warning(f"Executable '{executable}' not found on system PATH. Launching simulated game loop using {sys.executable}.")
+                simulated_cmd = [sys.executable, "-c", "import time; print('Game running'); time.sleep(3600)"]
                 proc = subprocess.Popen(simulated_cmd, **kwargs)
 
             self._running_processes[session_id] = proc
@@ -83,7 +96,6 @@ class GameLauncher:
         logger.info(f"Terminating game process tree for session {session_id} (PID: {pid})...")
 
         try:
-            # Kill child processes first using psutil
             parent = psutil.Process(pid)
             children = parent.children(recursive=True)
             for child in children:
@@ -93,11 +105,10 @@ class GameLauncher:
                     pass
             parent.terminate()
 
-            # Wait up to 3 seconds for graceful exit
             gone, alive = psutil.wait_procs(children + [parent], timeout=3)
             for p in alive:
                 try:
-                    p.kill() # Force kill if hanging
+                    p.kill()
                 except (psutil.NoSuchProcess, psutil.AccessDenied):
                     pass
         except psutil.NoSuchProcess:
@@ -111,4 +122,3 @@ class GameLauncher:
                 del self._running_processes[session_id]
 
 game_launcher = GameLauncher()
-

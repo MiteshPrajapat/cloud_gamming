@@ -6,7 +6,8 @@ cd "$DIR"
 
 echo "=== Initializing Personal Cloud Gaming Platform on AWS EC2 C7i ==="
 
-# Export software rendering flags
+# Export software rendering flags and binary path
+export PATH="/usr/games:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:$PATH"
 export DISPLAY=:99
 export LIBGL_ALWAYS_SOFTWARE=1
 export GALLIUM_DRIVER=llvmpipe

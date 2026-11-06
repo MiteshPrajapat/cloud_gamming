@@ -10,6 +10,7 @@ ExecStart=/bin/bash /home/ubuntu/cloud_gamming/scripts/start_server.sh
 Restart=always
 RestartSec=3
 Environment=PYTHONUNBUFFERED=1
+Environment=PATH=/usr/games:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
 [Install]
 WantedBy=multi-user.target
