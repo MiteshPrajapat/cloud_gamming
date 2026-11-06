@@ -1,4 +1,5 @@
 import os
+import re
 import time
 import json
 import uuid
@@ -169,6 +170,35 @@ class DownloadManager:
         self._save_persisted_downloads()
         return True
 
+    async def _resolve_stream_url(self, url: str) -> str:
+        """Resolves file hoster landing pages (such as megadb.net) to direct CDN streaming URLs"""
+        parsed = urlparse(url)
+        if "megadb.net" in parsed.netloc and "?" not in parsed.query and "error" not in parsed.path:
+            try:
+                headers = {
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                    "Referer": "https://steamrip.com/"
+                }
+                timeout = aiohttp.ClientTimeout(total=45, connect=15)
+                async with aiohttp.ClientSession(timeout=timeout) as session:
+                    async with session.get(url, headers=headers) as resp:
+                        text = await resp.text()
+                        match = re.search(r"var finalDownloadUrl = '([^']+)'", text)
+                        if match:
+                            final_page = match.group(1)
+                            # Wait the 11 second server countdown
+                            await asyncio.sleep(11)
+                            headers["Referer"] = url
+                            async with session.get(final_page, headers=headers, allow_redirects=False) as resp2:
+                                if resp2.status in (301, 302, 303, 307):
+                                    loc = resp2.headers.get("Location")
+                                    if loc:
+                                        logger.info(f"Resolved MegaDB landing page to direct CDN: {loc}")
+                                        return loc
+            except Exception as e:
+                logger.warning(f"Could not auto-resolve MegaDB URL: {e}")
+        return url
+
     async def _download_worker(self, job: DownloadJob, final_dest: Path):
         """Asynchronous streaming download worker with progress calculation & hash verification"""
         cancel_event = self._cancel_events.get(job.id, asyncio.Event())
@@ -193,9 +223,12 @@ class DownloadManager:
             headers["Referer"] = "https://megadb.net/"
 
         try:
+            # 0. Automatically resolve hoster landing pages if applicable
+            current_url = await self._resolve_stream_url(job.source_url)
+            if "megadb" in current_url.lower():
+                headers["Referer"] = "https://megadb.net/"
+
             async with aiohttp.ClientSession(timeout=timeout) as session:
-                # Safe redirect handling
-                current_url = job.source_url
                 for _ in range(5): # max 5 redirects
                     validate_download_url(current_url)
                     async with session.get(current_url, headers=headers, allow_redirects=False) as resp:
