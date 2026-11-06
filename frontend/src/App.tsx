@@ -54,15 +54,19 @@ export function App() {
   useEffect(() => {
     loadData();
 
-    // Poll server metrics every 6 seconds
+    // Poll server metrics & active game updates
     const interval = setInterval(async () => {
       try {
-        const status = await api.getServerStatus();
-        setServerStatus(status);
+        const [status, gamesList] = await Promise.all([
+          api.getServerStatus().catch(() => null),
+          api.getGames().catch(() => null),
+        ]);
+        if (status) setServerStatus(status);
+        if (gamesList) setGames(gamesList);
       } catch {
         // ignore background poll errors
       }
-    }, 6000);
+    }, 5000);
 
     return () => clearInterval(interval);
   }, []);
@@ -189,6 +193,7 @@ export function App() {
         isOpen={isAdminOpen}
         onClose={() => setIsAdminOpen(false)}
         onGameAdded={handleGameAdded}
+        onPlayGame={handlePlayGame}
       />
     </div>
   );

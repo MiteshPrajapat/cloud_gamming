@@ -5,6 +5,7 @@ from pydantic import BaseModel
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 GAMES_DIR = Path(os.getenv("GAMES_DIR", str(BASE_DIR / "games")))
 GAMES_DATA_FILE = Path(os.getenv("GAMES_DATA_FILE", str(BASE_DIR / "backend" / "games_data.json")))
+DOWNLOADS_DATA_FILE = Path(os.getenv("DOWNLOADS_DATA_FILE", str(BASE_DIR / "backend" / "downloads_data.json")))
 
 class Settings(BaseModel):
     app_name: str = "Personal Cloud Gaming Platform"
@@ -41,9 +42,20 @@ class Settings(BaseModel):
         "PULSE_SERVER": "127.0.0.1:4713"
     }
     
-    # Paths
+    # Storage & Game Directories
     games_dir: Path = GAMES_DIR
+    downloads_dir: Path = GAMES_DIR / "downloads"
+    installed_dir: Path = GAMES_DIR / "installed"
+    temp_dir: Path = GAMES_DIR / "temp"
+    
+    # Data Persistence Files
     games_data_file: Path = GAMES_DATA_FILE
+    downloads_data_file: Path = DOWNLOADS_DATA_FILE
+    
+    # Storage Safety Limits (30 GB EC2 Disk Optimization)
+    max_download_size_mb: int = int(os.getenv("MAX_DOWNLOAD_SIZE_MB", "5000")) # Max 5 GB per game download
+    min_disk_free_gb_buffer: float = float(os.getenv("MIN_DISK_FREE_GB_BUFFER", "2.0")) # Reserve at least 2 GB
+    auto_cleanup_archive: bool = os.getenv("AUTO_CLEANUP_ARCHIVE", "true").lower() == "true"
     
     # Security
     cors_origins: list[str] = ["*"]
@@ -51,3 +63,6 @@ class Settings(BaseModel):
 
 settings = Settings()
 
+# Ensure directories exist
+for d in [settings.games_dir, settings.downloads_dir, settings.installed_dir, settings.temp_dir]:
+    d.mkdir(parents=True, exist_ok=True)

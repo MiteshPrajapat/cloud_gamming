@@ -4,9 +4,23 @@ import logging
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from backend.app.services.input_manager import input_manager
 from backend.app.services.session_manager import session_manager
+from backend.app.services.download_broadcaster import download_broadcaster
 
 logger = logging.getLogger("cloudgaming.ws")
 router = APIRouter(tags=["WebSocket Input"])
+
+@router.websocket("/ws/admin/downloads")
+async def websocket_admin_downloads(websocket: WebSocket):
+    await download_broadcaster.connect(websocket)
+    try:
+        while True:
+            msg = await websocket.receive_text()
+            if msg == "ping":
+                await websocket.send_text("pong")
+    except WebSocketDisconnect:
+        download_broadcaster.disconnect(websocket)
+    except Exception:
+        download_broadcaster.disconnect(websocket)
 
 @router.websocket("/ws/session/{session_id}")
 async def websocket_session_input(websocket: WebSocket, session_id: str):
