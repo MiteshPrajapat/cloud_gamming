@@ -51,6 +51,25 @@ class StreamingManager:
         except Exception:
             return False
 
+    def _ensure_display_modes(self):
+        """Ensures standard 4:3 legacy resolutions (800x600, 640x480, 1024x768) are registered in XrandR for DirectX/DirectDraw games"""
+        if not self._is_linux:
+            return
+        env = os.environ.copy()
+        env["DISPLAY"] = settings.display
+        modes = [
+            ("800x600", "38.25 800 832 912 1024 600 603 607 624 -hsync +vsync"),
+            ("640x480", "25.20 640 656 752 800 480 490 492 525 -hsync -vsync"),
+            ("1024x768", "65.00 1024 1048 1184 1344 768 771 777 806 -hsync -vsync"),
+        ]
+        for name, modeline in modes:
+            try:
+                cmd_new = ["xrandr", "--newmode", name] + modeline.split()
+                subprocess.run(cmd_new, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
+                subprocess.run(["xrandr", "--addmode", "screen", name], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
+            except Exception:
+                pass
+
     def start_streaming_stack(self, resolution: str = "1280x720") -> Dict[str, Any]:
         """
         Starts the headless gaming display stack on AWS Linux if not already active:
@@ -90,6 +109,9 @@ class StreamingManager:
                 logger.warning("Xvfb binary not found. Please install xvfb on Ubuntu: apt-get install -y xvfb")
         else:
             logger.debug(f"Display {settings.display} is already active.")
+
+        # Ensure standard video modes (800x600, etc.) exist on virtual display
+        self._ensure_display_modes()
 
         # 2. Start Openbox window manager if needed
         if not self.is_wm_running() and self._wm_proc is None:

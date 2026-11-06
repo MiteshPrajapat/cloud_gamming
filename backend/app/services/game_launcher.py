@@ -47,10 +47,40 @@ class GameLauncher:
 
         cmd: List[str] = []
         if game.game_type == "windows":
-            # Wine execution for lightweight Windows games
+            # Wine execution for Windows games
             wine_prefix = os.path.join(str(settings.games_dir), ".wine_prefix")
             os.makedirs(wine_prefix, exist_ok=True)
             env["WINEPREFIX"] = wine_prefix
+            if os.name != "nt":
+                # Ensure pulse audio server connection for DirectSound support
+                uid = os.getuid()
+                env["PULSE_SERVER"] = f"unix:/run/user/{uid}/pulse/native"
+                # Start pulse daemon if not running
+                try:
+                    subprocess.run(["pulseaudio", "--check"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
+                    res = subprocess.run(["pulseaudio", "--check"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    if res.returncode != 0:
+                        subprocess.run(["pulseaudio", "-D", "--exit-idle-time=-1"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
+                        subprocess.run(["pactl", "load-module", "module-null-sink", "sink_name=dummy"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
+                        subprocess.run(["pactl", "set-default-sink", "dummy"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
+                except Exception as pe:
+                    logger.debug(f"Audio init check error: {pe}")
+
+            # Specific patch for GTA SA: disable video cutscenes that require missing mpeg decoders
+            game_dir = game.installed_path or (os.path.dirname(executable) if os.path.isabs(executable) else None)
+            if game_dir and os.path.exists(game_dir):
+                movies_dir = os.path.join(game_dir, "movies")
+                if os.path.exists(movies_dir):
+                    for mfile in ["Logo.mpg", "GTAtitles.mpg"]:
+                        src = os.path.join(movies_dir, mfile)
+                        dst = os.path.join(movies_dir, f"{mfile}.bak")
+                        if os.path.exists(src) and not os.path.exists(dst):
+                            try:
+                                os.rename(src, dst)
+                                logger.info(f"Auto-renamed {mfile} to bypass intro movie codec stall.")
+                            except Exception:
+                                pass
+
             cmd = ["wine", executable]
         else:
             cmd = [executable]
@@ -64,10 +94,13 @@ class GameLauncher:
         logger.info(f"Launching game '{game.name}' for session {session_id}: {' '.join(cmd)}")
 
         try:
+            log_path = f"/tmp/game_{session_id}.log" if os.name != "nt" else os.path.join(os.environ.get("TEMP", "."), f"game_{session_id}.log")
+            log_file = open(log_path, "w", encoding="utf-8", errors="replace")
+
             kwargs = {
                 "env": env,
-                "stdout": subprocess.PIPE,
-                "stderr": subprocess.PIPE
+                "stdout": log_file,
+                "stderr": log_file
             }
             if os.name != "nt":
                 kwargs["preexec_fn"] = os.setsid
@@ -126,5 +159,9 @@ class GameLauncher:
         finally:
             if session_id in self._running_processes:
                 del self._running_processes[session_id]
+            if os.name != "nt":
+                # Clean up wineserver if no other game is running
+                if not self._running_processes:
+                    subprocess.run(["wineserver", "-k"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
 
 game_launcher = GameLauncher()
