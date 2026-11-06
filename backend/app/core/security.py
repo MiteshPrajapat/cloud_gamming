@@ -120,8 +120,40 @@ def safe_extract_archive_with_limits(
 
     suffix = archive_path.name.lower()
 
-    # 1. ZIP Archive Handling
-    if zipfile.is_zipfile(archive_path) or suffix.endswith(".zip"):
+    # Detect RAR magic bytes
+    is_rar = suffix.endswith(".rar")
+    try:
+        with open(archive_path, "rb") as mf:
+            if mf.read(7).startswith(b"Rar!\x1a\x07"):
+                is_rar = True
+    except Exception:
+        pass
+
+    # 1. 7Z and RAR Archives (Magic bytes or extension)
+    if is_rar or suffix.endswith(".7z"):
+        seven_zip = shutil.which("7z") or shutil.which("7za")
+        unrar_bin = shutil.which("unrar") or shutil.which("unrar-nonfree") or shutil.which("unrar-free")
+
+        if seven_zip:
+            cmd = [seven_zip, "x", "-y", f"-o{str(target_dir)}", str(archive_path)]
+            res = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, check=False)
+            if res.returncode != 0:
+                raise HTTPException(status_code=400, detail=f"Failed to extract archive: {res.stderr.decode('utf-8', errors='ignore')}")
+        elif unrar_bin and is_rar:
+            cmd = [unrar_bin, "x", "-y", "-o+", str(archive_path), str(target_dir) + "/"]
+            res = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, check=False)
+            if res.returncode != 0:
+                raise HTTPException(status_code=400, detail=f"Failed to extract RAR archive: {res.stderr.decode('utf-8', errors='ignore')}")
+        else:
+            raise HTTPException(status_code=400, detail="Neither 7z nor unrar extraction utility installed on server.")
+
+        for root, _, files in os.walk(target_dir):
+            for f in files:
+                rel = os.path.relpath(os.path.join(root, f), target_dir)
+                extracted_files.append(rel)
+
+    # 2. ZIP Archive Handling
+    elif zipfile.is_zipfile(archive_path) or (suffix.endswith(".zip") and zipfile.is_zipfile(archive_path)):
         with zipfile.ZipFile(archive_path, 'r') as zf:
             for member in zf.infolist():
                 file_count += 1
@@ -146,7 +178,7 @@ def safe_extract_archive_with_limits(
                 if not member.is_dir():
                     extracted_files.append(str(member_path.relative_to(target_dir)))
 
-    # 2. TAR Archives (.tar, .tar.gz, .tar.bz2, .tar.xz)
+    # 3. TAR Archives (.tar, .tar.gz, .tar.bz2, .tar.xz)
     elif tarfile.is_tarfile(archive_path) or any(suffix.endswith(ext) for ext in [".tar", ".tar.gz", ".tgz", ".tar.bz2", ".tbz2", ".tar.xz", ".txz"]):
         with tarfile.open(archive_path, 'r:*') as tf:
             for member in tf.getmembers():
@@ -171,29 +203,6 @@ def safe_extract_archive_with_limits(
                 tf.extract(member, target_dir)
                 if member.isfile():
                     extracted_files.append(str(member_path.relative_to(target_dir)))
-
-    # 3. 7Z and RAR Archives
-    elif suffix.endswith((".7z", ".rar")):
-        seven_zip = shutil.which("7z") or shutil.which("7za")
-        unrar_bin = shutil.which("unrar") or shutil.which("unrar-nonfree") or shutil.which("unrar-free")
-
-        if seven_zip:
-            cmd = [seven_zip, "x", "-y", f"-o{str(target_dir)}", str(archive_path)]
-            res = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, check=False)
-            if res.returncode != 0:
-                raise HTTPException(status_code=400, detail=f"Failed to extract archive: {res.stderr.decode('utf-8', errors='ignore')}")
-        elif unrar_bin and suffix.endswith(".rar"):
-            cmd = [unrar_bin, "x", "-y", "-o+", str(archive_path), str(target_dir) + "/"]
-            res = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, check=False)
-            if res.returncode != 0:
-                raise HTTPException(status_code=400, detail=f"Failed to extract RAR archive: {res.stderr.decode('utf-8', errors='ignore')}")
-        else:
-            raise HTTPException(status_code=400, detail="Neither 7z nor unrar extraction utility installed on server.")
-
-        for root, _, files in os.walk(target_dir):
-            for f in files:
-                rel = os.path.relpath(os.path.join(root, f), target_dir)
-                extracted_files.append(rel)
     else:
         raise HTTPException(status_code=400, detail=f"Unsupported archive format: {archive_path.name}")
 
