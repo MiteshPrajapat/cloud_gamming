@@ -46,18 +46,25 @@ class SessionManager:
         Validates resources and launches a cloud gaming session.
         Enforces 1 concurrent session limit for AWS C7i 4-vCPU/8GB RAM.
         """
-        # 1. Check system resources
-        sys_status = system_monitor.get_system_status()
-        if sys_status["cpu"]["percent"] >= settings.max_cpu_percent_threshold:
-            raise RuntimeError(f"Server CPU too high ({sys_status['cpu']['percent']}%). Unable to launch.")
-        if sys_status["ram"]["percent"] >= settings.max_ram_percent_threshold:
-            raise RuntimeError(f"Server RAM too high ({sys_status['ram']['percent']}%). Unable to launch.")
-
-        # 2. Check active sessions limit
+        # 1. Check active sessions limit and stop existing session to free CPU/RAM
         running_count = self.get_active_session_count()
         if running_count >= settings.max_concurrent_sessions:
-            # Terminate any stale running session if old
             current = self.get_current_session()
+            if current:
+                logger.warning(f"Reaching max sessions ({settings.max_concurrent_sessions}). Automatically closing older session {current.session_id} to prioritize new game.")
+                await self.stop_session(current.session_id)
+                await asyncio.sleep(0.5)
+
+        # 2. Check system resources after clearing previous session
+        sys_status = system_monitor.get_system_status()
+        if sys_status["cpu"]["percent"] >= settings.max_cpu_percent_threshold:
+            # Recheck after brief delay
+            await asyncio.sleep(0.5)
+            sys_status = system_monitor.get_system_status()
+            if sys_status["cpu"]["percent"] >= settings.max_cpu_percent_threshold:
+                raise RuntimeError(f"Server CPU too high ({sys_status['cpu']['percent']}%). Unable to launch.")
+        if sys_status["ram"]["percent"] >= settings.max_ram_percent_threshold:
+            raise RuntimeError(f"Server RAM too high ({sys_status['ram']['percent']}%). Unable to launch.")
             if current:
                 logger.warning(f"Reaching max sessions ({settings.max_concurrent_sessions}). Automatically closing older session {current.session_id} to prioritize new game.")
                 await self.stop_session(current.session_id)
