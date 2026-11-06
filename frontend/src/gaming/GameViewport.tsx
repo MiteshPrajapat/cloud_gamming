@@ -11,6 +11,7 @@ import {
 import type { GamingSession, Game } from '../types';
 import { useInputForwarder } from '../hooks/useInputForwarder';
 import { useDeviceDetect } from '../hooks/useDeviceDetect';
+import { useGamepad } from '../hooks/useGamepad';
 import { MobileController } from './MobileController';
 
 interface GameViewportProps {
@@ -44,6 +45,13 @@ export const GameViewport: React.FC<GameViewportProps> = ({ session, game, onExi
     setControlProfile,
     resetKeys,
   } = useInputForwarder({ sessionId: session.session_id, enabled: true });
+
+  // Hardware Bluetooth/USB Gamepad API listener
+  useGamepad({
+    onButtonAction: sendGamepadButton,
+    onJoystickMove: sendJoystickDirection,
+    enabled: true,
+  });
 
   // Session duration timer
   useEffect(() => {
@@ -235,7 +243,7 @@ export const GameViewport: React.FC<GameViewportProps> = ({ session, game, onExi
         */}
         <iframe
           ref={iframeRef}
-          src={session.stream_url}
+          src={session.stream_url.startsWith('http') ? session.stream_url : `${window.location.protocol}//${window.location.host}${session.stream_url}`}
           title={game.name}
           className="w-full h-full border-0 pointer-events-auto"
           style={{

@@ -41,7 +41,7 @@ class SessionManager:
         """Updates last activity timestamp to prevent idle timeout"""
         self._session_last_activity[session_id] = time.time()
 
-    async def create_session(self, game: Game, req: LaunchRequest, host_ip: str = "localhost") -> GamingSession:
+    async def create_session(self, game: Game, req: LaunchRequest, host_ip: str = "localhost", host_header: str = "") -> GamingSession:
         """
         Validates resources and launches a cloud gaming session.
         Enforces 1 concurrent session limit for AWS C7i 4-vCPU/8GB RAM.
@@ -65,9 +65,13 @@ class SessionManager:
         session_id = f"sess_{uuid.uuid4().hex[:12]}"
         now = datetime.utcnow()
 
-        # Build dynamic streaming URLs
-        stream_url = f"http://{host_ip}:{settings.websockify_port}/vnc.html?autoconnect=true&resize=scale"
-        ws_url = f"ws://{host_ip}:{settings.api_port}/ws/session/{session_id}"
+        # Build dynamic streaming URLs (support reverse proxy Port 80 & direct Port 8000/6080)
+        if ":" not in host_header and host_header != "":
+            stream_url = "/vnc.html?autoconnect=true&resize=scale&path=websockify"
+            ws_url = f"/ws/session/{session_id}"
+        else:
+            stream_url = f"http://{host_ip}:{settings.websockify_port}/vnc.html?autoconnect=true&resize=scale"
+            ws_url = f"ws://{host_ip}:{settings.api_port}/ws/session/{session_id}"
 
         session = GamingSession(
             session_id=session_id,

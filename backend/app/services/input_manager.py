@@ -97,13 +97,22 @@ class InputManager:
     def __init__(self):
         self._active_keys: Dict[str, Set[str]] = defaultdict(set)
         self._session_profiles: Dict[str, str] = {}
+        self._custom_mappings: Dict[str, Dict[str, str]] = {}
         self._has_xdotool = (shutil.which("xdotool") is not None)
         if not self._has_xdotool:
             logger.info("xdotool not found on PATH. Will use fallback logging/mock mode if not on Ubuntu X11.")
 
-    def set_session_profile(self, session_id: str, profile: str):
-        if profile in PROFILE_MAPPINGS:
+    def set_session_profile(self, session_id: str, profile: str, custom_mapping: Optional[Dict[str, str]] = None):
+        if profile in PROFILE_MAPPINGS or profile == "custom":
             self._session_profiles[session_id] = profile
+        if custom_mapping:
+            self._custom_mappings[session_id] = custom_mapping
+
+    def get_session_profile_mapping(self, session_id: str) -> Dict[str, str]:
+        profile = self._session_profiles.get(session_id, "wasd")
+        if profile == "custom" and session_id in self._custom_mappings:
+            return self._custom_mappings[session_id]
+        return PROFILE_MAPPINGS.get(profile, PROFILE_MAPPINGS["wasd"])
 
     def get_session_profile(self, session_id: str) -> str:
         return self._session_profiles.get(session_id, "wasd")

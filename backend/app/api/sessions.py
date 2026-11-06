@@ -14,10 +14,11 @@ async def launch_game(game_id: str, req: LaunchRequest, request: Request):
     if not game:
         raise HTTPException(status_code=404, detail=f"Game '{game_id}' not found.")
 
-    host_ip = request.headers.get("host", "localhost").split(":")[0]
+    host_header = request.headers.get("host", "localhost")
+    host_ip = host_header.split(":")[0]
 
     try:
-        session = await session_manager.create_session(game, req, host_ip=host_ip)
+        session = await session_manager.create_session(game, req, host_ip=host_ip, host_header=host_header)
         return session
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Launch failed: {str(e)}")

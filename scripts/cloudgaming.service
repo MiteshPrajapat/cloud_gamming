@@ -1,0 +1,15 @@
+[Unit]
+Description=Personal Cloud Gaming Platform (AWS EC2 C7i)
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/cloud_gamming
+ExecStart=/bin/bash /home/ubuntu/cloud_gamming/scripts/start_server.sh
+Restart=always
+RestartSec=3
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target
