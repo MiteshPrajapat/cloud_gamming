@@ -72,6 +72,12 @@ class GameLauncher:
             if os.name != "nt":
                 kwargs["preexec_fn"] = os.setsid
 
+            # Set working directory to game folder so game can find its assets and DLLs
+            if os.path.isabs(executable) and os.path.exists(executable):
+                kwargs["cwd"] = os.path.dirname(executable)
+            elif game.installed_path and os.path.exists(game.installed_path):
+                kwargs["cwd"] = game.installed_path
+
             proc = None
             try:
                 proc = subprocess.Popen(cmd, **kwargs)
