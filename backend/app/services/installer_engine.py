@@ -27,19 +27,23 @@ def detect_archive_format(file_path: Path) -> str:
         return "tar"
     if name.endswith(".7z"):
         return "7z"
+    if name.endswith(".rar"):
+        return "rar"
     if name.endswith((".sh", ".bin", ".x86_64", ".x86", ".exe")):
         return "direct_executable"
 
     # Check magic bytes
     try:
         with open(file_path, "rb") as f:
-            magic = f.read(6)
+            magic = f.read(7)
             if magic.startswith(b"PK\x03\x04"):
                 return "zip"
             if magic.startswith(b"\x1f\x8b"):
                 return "tar.gz"
             if magic.startswith(b"7z\xbc\xaf\x27\x1c"):
                 return "7z"
+            if magic.startswith(b"Rar!\x1a\x07"):
+                return "rar"
             if magic.startswith(b"\xfd7zXZ\x00"):
                 return "tar.xz"
             if magic.startswith(b"\x7fELF") or magic.startswith(b"MZ"):

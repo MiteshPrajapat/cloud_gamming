@@ -92,3 +92,4 @@ if __name__ == "__main__":
     test_storage_api()
     test_download_and_install_flow()
     print("\nALL AUTOMATIC GAME DOWNLOADER TESTS PASSED!")
+

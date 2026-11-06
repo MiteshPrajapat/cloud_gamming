@@ -540,6 +540,7 @@ export const AdminGameModal: React.FC<AdminGameModalProps> = ({
                     className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-700 focus:border-cyan-400 text-sm focus:outline-none transition-colors font-mono"
                   >
                     <option value="zip">ZIP Archive (.zip)</option>
+                    <option value="rar">RAR Archive (.rar)</option>
                     <option value="tar.gz">TAR GZip (.tar.gz, .tgz)</option>
                     <option value="tar.xz">TAR XZ (.tar.xz)</option>
                     <option value="tar">TAR (.tar)</option>

@@ -145,3 +145,4 @@ async def list_candidate_executables(game_id: str, platform: str = "linux"):
     
     candidates = scan_candidate_executables(target_dir, platform=platform)
     return {"game_id": game_id, "candidates": candidates}
+

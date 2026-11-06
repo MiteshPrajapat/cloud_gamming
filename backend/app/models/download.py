@@ -43,3 +43,4 @@ class DownloadJob(BaseModel):
     error_message: Optional[str] = None
     created_at: str = Field(default_factory=lambda: datetime.utcnow().isoformat())
     updated_at: Optional[str] = None
+

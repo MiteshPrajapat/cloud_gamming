@@ -184,8 +184,13 @@ class DownloadManager:
         last_broadcast_time = start_time
         downloaded_bytes = 0
 
-        timeout = aiohttp.ClientTimeout(total=3600, connect=30)
-        headers = {"User-Agent": "CloudGamingInstaller/1.0"}
+        timeout = aiohttp.ClientTimeout(total=7200, connect=60)
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "*/*"
+        }
+        if "megadb" in job.source_url.lower():
+            headers["Referer"] = "https://megadb.net/"
 
         try:
             async with aiohttp.ClientSession(timeout=timeout) as session:
@@ -371,3 +376,4 @@ class DownloadManager:
             json.dump(games, f, indent=2)
 
 download_manager = DownloadManager()
+

@@ -23,3 +23,4 @@ class InstallConfirmRequest(BaseModel):
     executable_path: str = Field(..., description="Selected binary executable to launch")
     launch_args: Optional[List[str]] = Field(default=[], description="Launch arguments passed to the executable")
     cleanup_archive: bool = Field(default=True, description="Delete original archive after successful installation")
+

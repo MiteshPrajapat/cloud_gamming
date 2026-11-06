@@ -101,11 +101,11 @@ def check_disk_space_available(required_bytes: int = 0):
 def safe_extract_archive_with_limits(
     archive_path: Path,
     target_dir: Path,
-    max_decompressed_bytes: int = 6 * (1024 ** 3), # Max 6 GB decompressed
-    max_file_count: int = 15000 # Max 15,000 files (ZIP Bomb protection)
+    max_decompressed_bytes: int = 12 * (1024 ** 3), # Max 12 GB decompressed (supports GTA San Andreas)
+    max_file_count: int = 50000 # Max 50,000 files (ZIP Bomb protection)
 ) -> List[str]:
     """
-    Safely extracts archives (.zip, .tar, .tar.gz, .tar.xz, .7z) with:
+    Safely extracts archives (.zip, .tar, .tar.gz, .tar.xz, .7z, .rar) with:
     1. ZipSlip path-traversal protection.
     2. ZIP bomb protection (file count & byte expansion limit).
     3. Symlink escape protection.
@@ -172,16 +172,23 @@ def safe_extract_archive_with_limits(
                 if member.isfile():
                     extracted_files.append(str(member_path.relative_to(target_dir)))
 
-    # 3. 7Z Archives
-    elif suffix.endswith(".7z"):
+    # 3. 7Z and RAR Archives
+    elif suffix.endswith((".7z", ".rar")):
         seven_zip = shutil.which("7z") or shutil.which("7za")
-        if not seven_zip:
-            raise HTTPException(status_code=400, detail="7z extraction utility not installed on server. Please use ZIP or TAR format.")
+        unrar_bin = shutil.which("unrar") or shutil.which("unrar-nonfree") or shutil.which("unrar-free")
 
-        cmd = [seven_zip, "x", "-y", f"-o{str(target_dir)}", str(archive_path)]
-        res = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, check=False)
-        if res.returncode != 0:
-            raise HTTPException(status_code=400, detail=f"Failed to extract 7z archive: {res.stderr.decode('utf-8', errors='ignore')}")
+        if seven_zip:
+            cmd = [seven_zip, "x", "-y", f"-o{str(target_dir)}", str(archive_path)]
+            res = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, check=False)
+            if res.returncode != 0:
+                raise HTTPException(status_code=400, detail=f"Failed to extract archive: {res.stderr.decode('utf-8', errors='ignore')}")
+        elif unrar_bin and suffix.endswith(".rar"):
+            cmd = [unrar_bin, "x", "-y", "-o+", str(archive_path), str(target_dir) + "/"]
+            res = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, check=False)
+            if res.returncode != 0:
+                raise HTTPException(status_code=400, detail=f"Failed to extract RAR archive: {res.stderr.decode('utf-8', errors='ignore')}")
+        else:
+            raise HTTPException(status_code=400, detail="Neither 7z nor unrar extraction utility installed on server.")
 
         for root, _, files in os.walk(target_dir):
             for f in files:
