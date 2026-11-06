@@ -55,3 +55,7 @@ Thumbs.db
 # Cloud Gaming session uploads & caches
 games/samples/__pycache__/
 backend/app/**/__pycache__/
+backend/downloads_data.json
+games/downloads/
+games/installed/
+games/temp/
