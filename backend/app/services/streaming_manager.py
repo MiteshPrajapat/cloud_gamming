@@ -1,5 +1,6 @@
 import os
 import shutil
+import socket
 import subprocess
 import time
 import logging
@@ -15,6 +16,25 @@ class StreamingManager:
         self._vnc_proc: Optional[subprocess.Popen] = None
         self._websockify_proc: Optional[subprocess.Popen] = None
         self._is_linux = (os.name != "nt")
+
+    def is_port_in_use(self, port: int) -> bool:
+        """Checks if a TCP port is currently listening on localhost"""
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.settimeout(0.5)
+                return s.connect_ex(('127.0.0.1', port)) == 0
+        except Exception:
+            return False
+
+    def is_wm_running(self) -> bool:
+        """Checks if openbox window manager process is running"""
+        if not self._is_linux:
+            return True
+        try:
+            res = subprocess.run(["pgrep", "-f", "openbox"], stdout=subprocess.DEVNULL, check=False)
+            return res.returncode == 0
+        except Exception:
+            return False
 
     def is_display_active(self) -> bool:
         """Checks if virtual display is up and accessible"""
@@ -33,11 +53,11 @@ class StreamingManager:
 
     def start_streaming_stack(self, resolution: str = "1280x720") -> Dict[str, Any]:
         """
-        Starts the headless gaming display stack on AWS Linux:
+        Starts the headless gaming display stack on AWS Linux if not already active:
         1. Xvfb virtual framebuffer on DISPLAY (e.g. :99)
         2. Openbox ultra-lightweight window manager
-        3. x11vnc server
-        4. websockify WebSocket proxy for noVNC
+        3. x11vnc server (port 5900)
+        4. websockify WebSocket proxy for noVNC (port 6080)
         """
         if not self._is_linux:
             logger.info("Local non-Linux development detected: streaming stack mock active.")
@@ -68,45 +88,57 @@ class StreamingManager:
                 time.sleep(1.0)
             else:
                 logger.warning("Xvfb binary not found. Please install xvfb on Ubuntu: apt-get install -y xvfb")
+        else:
+            logger.debug(f"Display {settings.display} is already active.")
 
         # 2. Start Openbox window manager if needed
-        openbox_path = shutil.which("openbox")
-        if openbox_path and self._wm_proc is None:
-            logger.info("Starting Openbox window manager...")
-            env = os.environ.copy()
-            env["DISPLAY"] = settings.display
-            self._wm_proc = subprocess.Popen([openbox_path], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        if not self.is_wm_running() and self._wm_proc is None:
+            openbox_path = shutil.which("openbox")
+            if openbox_path:
+                logger.info("Starting Openbox window manager...")
+                env = os.environ.copy()
+                env["DISPLAY"] = settings.display
+                self._wm_proc = subprocess.Popen([openbox_path], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        else:
+            logger.debug("Openbox is already running.")
 
-        # 3. Start x11vnc if needed
-        x11vnc_path = shutil.which("x11vnc")
-        if x11vnc_path and self._vnc_proc is None:
-            logger.info(f"Starting x11vnc on port {settings.vnc_port}...")
-            vnc_cmd = [
-                x11vnc_path,
-                "-display", settings.display,
-                "-forever",
-                "-shared",
-                "-rfbport", str(settings.vnc_port),
-                "-nopw",
-                "-repeat",
-                "-noxdamage",
-                "-wait", "50",
-                "-defer", "50"
-            ]
-            self._vnc_proc = subprocess.Popen(vnc_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            time.sleep(0.5)
+        # 3. Start x11vnc if not already listening on port 5900
+        if not self.is_port_in_use(settings.vnc_port) and self._vnc_proc is None:
+            x11vnc_path = shutil.which("x11vnc")
+            if x11vnc_path:
+                logger.info(f"Starting x11vnc on port {settings.vnc_port}...")
+                vnc_cmd = [
+                    x11vnc_path,
+                    "-display", settings.display,
+                    "-forever",
+                    "-shared",
+                    "-rfbport", str(settings.vnc_port),
+                    "-nopw",
+                    "-repeat",
+                    "-noxdamage",
+                    "-wait", "50",
+                    "-defer", "50"
+                ]
+                self._vnc_proc = subprocess.Popen(vnc_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                time.sleep(0.5)
+        else:
+            logger.debug(f"x11vnc port {settings.vnc_port} is already active.")
 
-        # 4. Start websockify proxy if needed
-        websockify_path = shutil.which("websockify")
-        if websockify_path and self._websockify_proc is None:
-            logger.info(f"Starting websockify on port {settings.websockify_port} -> 127.0.0.1:{settings.vnc_port}...")
-            ws_cmd = [
-                websockify_path,
-                str(settings.websockify_port),
-                f"127.0.0.1:{settings.vnc_port}"
-            ]
-            self._websockify_proc = subprocess.Popen(ws_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            time.sleep(0.5)
+        # 4. Start websockify proxy if not already listening on port 6080
+        if not self.is_port_in_use(settings.websockify_port) and self._websockify_proc is None:
+            websockify_path = shutil.which("websockify")
+            if websockify_path:
+                logger.info(f"Starting websockify on port {settings.websockify_port} -> 127.0.0.1:{settings.vnc_port}...")
+                ws_cmd = [
+                    websockify_path,
+                    "--web", "/usr/share/novnc",
+                    str(settings.websockify_port),
+                    f"127.0.0.1:{settings.vnc_port}"
+                ]
+                self._websockify_proc = subprocess.Popen(ws_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                time.sleep(0.5)
+        else:
+            logger.debug(f"websockify port {settings.websockify_port} is already active.")
 
         return {
             "active": True,
@@ -118,7 +150,7 @@ class StreamingManager:
         }
 
     def stop_streaming_stack(self):
-        """Stops the streaming stack components if owned by this process"""
+        """Stops only child processes spawned by this instance"""
         for name, proc in [
             ("websockify", self._websockify_proc),
             ("x11vnc", self._vnc_proc),
@@ -126,7 +158,7 @@ class StreamingManager:
             ("Xvfb", self._xvfb_proc)
         ]:
             if proc and proc.poll() is None:
-                logger.info(f"Terminating {name} (PID: {proc.pid})...")
+                logger.info(f"Terminating spawned {name} (PID: {proc.pid})...")
                 proc.terminate()
                 try:
                     proc.wait(timeout=2)
@@ -139,4 +171,3 @@ class StreamingManager:
         self._xvfb_proc = None
 
 streaming_manager = StreamingManager()
-
