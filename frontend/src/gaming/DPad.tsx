@@ -131,3 +131,4 @@ export const DPad: React.FC<DPadProps> = ({ onDirection, scale = 1.0, haptics = 
     </div>
   );
 };
+

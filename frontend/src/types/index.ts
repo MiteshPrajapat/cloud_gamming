@@ -75,3 +75,4 @@ export interface ControllerConfig {
   swapSides: boolean;
   profile: ControlProfile;
 }
+

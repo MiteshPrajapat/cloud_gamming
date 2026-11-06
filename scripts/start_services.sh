@@ -39,3 +39,4 @@ sleep 0.5
 echo "Starting FastAPI Server on port 8000..."
 source venv/bin/activate
 python backend/run.py
+

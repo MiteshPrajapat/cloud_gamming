@@ -121,3 +121,4 @@ A critical issue in cloud gaming is "stuck keys" when a player disconnects, clos
    Games are spawned with `os.setsid` process groups. On exit, `psutil` traverses child processes and terminates all subprocesses, preventing rogue background mining or runaway processes.
 3. **Session Idle Timeout**:
    An automated background asyncio task monitors user input timestamps. If a session is idle for more than 30 minutes, it automatically terminates and frees AWS CPU and memory.
+

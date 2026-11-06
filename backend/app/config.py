@@ -21,8 +21,8 @@ class Settings(BaseModel):
     # Cloud Gaming Resource Management (Tailored for AWS C7i Large 4 vCPU / 8 GB RAM)
     max_concurrent_sessions: int = int(os.getenv("MAX_CONCURRENT_SESSIONS", "1"))
     session_idle_timeout_seconds: int = int(os.getenv("SESSION_IDLE_TIMEOUT_SECONDS", "1800")) # 30 mins
-    max_cpu_percent_threshold: float = float(os.getenv("MAX_CPU_PERCENT", "90.0"))
-    max_ram_percent_threshold: float = float(os.getenv("MAX_RAM_PERCENT", "90.0"))
+    max_cpu_percent_threshold: float = float(os.getenv("MAX_CPU_PERCENT", "98.0"))
+    max_ram_percent_threshold: float = float(os.getenv("MAX_RAM_PERCENT", "98.0"))
     
     # Default Display Resolution for CPU rendering efficiency
     default_screen_width: int = int(os.getenv("SCREEN_WIDTH", "1280"))

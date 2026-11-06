@@ -58,3 +58,4 @@ echo " Setup complete! Next steps:                              "
 echo " 1. Run bash scripts/install_games.sh to install games    "
 echo " 2. Run bash scripts/start_services.sh to start server    "
 echo "=========================================================="
+

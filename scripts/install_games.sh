@@ -20,3 +20,4 @@ which frozen-bubble || true
 which etr || true
 
 echo "All games successfully installed and ready for cloud play."
+

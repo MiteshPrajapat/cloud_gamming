@@ -81,3 +81,4 @@ RUN mkdir -p /app/games/samples /var/log/supervisor /root/.vnc
 EXPOSE 8000 6080 5900
 
 CMD ["/usr/bin/supervisord", "-n", "-c", "/etc/supervisor/conf.d/cloudgaming.conf"]
+

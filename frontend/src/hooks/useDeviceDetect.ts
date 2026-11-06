@@ -64,3 +64,4 @@ export function useDeviceDetect(): DeviceInfo {
 
   return deviceInfo;
 }
+
