@@ -171,8 +171,28 @@ class DownloadManager:
         return True
 
     async def _resolve_stream_url(self, url: str) -> str:
-        """Resolves file hoster landing pages (such as megadb.net) to direct CDN streaming URLs"""
+        """Resolves file hoster landing pages (MegaDB, Google Drive confirmation) to direct CDN streaming URLs"""
         parsed = urlparse(url)
+
+        # 1. Google Drive Virus Warning Confirmation
+        if ("drive.google.com" in parsed.netloc or "drive.usercontent.google.com" in parsed.netloc) and "confirm=t" not in url:
+            try:
+                headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+                timeout = aiohttp.ClientTimeout(total=20, connect=10)
+                async with aiohttp.ClientSession(timeout=timeout) as session:
+                    async with session.get(url, headers=headers) as resp:
+                        if resp.status == 200:
+                            text = await resp.text()
+                            uuid_match = re.search(r'name=["\']uuid["\']\s+value=["\']([^"\']+)["\']', text)
+                            if uuid_match:
+                                uuid_val = uuid_match.group(1)
+                                confirm_url = f"{url}&confirm=t&uuid={uuid_val}"
+                                logger.info(f"Resolved Google Drive confirmation URL: {confirm_url}")
+                                return confirm_url
+            except Exception as e:
+                logger.warning(f"Could not auto-resolve Google Drive URL: {e}")
+
+        # 2. MegaDB Countdown Resolver
         if "megadb.net" in parsed.netloc and "?" not in parsed.query and "error" not in parsed.path:
             try:
                 headers = {
@@ -255,6 +275,17 @@ class DownloadManager:
 
                             # Disk space check
                             check_disk_space_available(total_bytes)
+
+                        # Update filename and destination extension from Content-Disposition if present
+                        cd_header = resp.headers.get("Content-Disposition")
+                        if cd_header and "filename=" in cd_header:
+                            extracted_name = cd_header.split("filename=")[-1].strip('\"\' ')
+                            if extracted_name and "." in extracted_name:
+                                actual_ext = Path(extracted_name).suffix
+                                if actual_ext and not final_dest.name.endswith(actual_ext):
+                                    final_dest = final_dest.with_suffix(actual_ext)
+                                    job.destination_path = str(final_dest)
+                                    part_file = Path(f"{str(final_dest)}.part")
 
                         # Stream to disk
                         async with aiofiles.open(part_file, "wb") as out_f:
